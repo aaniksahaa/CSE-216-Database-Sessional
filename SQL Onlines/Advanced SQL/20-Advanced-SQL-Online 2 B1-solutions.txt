@@ -1,0 +1,85 @@
+--1
+SELECT DISTINCT (title) AS course_title
+FROM course
+WHERE course_id IN (
+  SELECT course_id
+  FROM takes
+  WHERE ID IN (
+    SELECT ID
+    FROM student
+    WHERE dept_name = 'Comp. Sci.'
+    UNION
+    SELECT ID
+    FROM student
+    WHERE dept_name = 'Math'
+  )
+)
+UNION
+SELECT DISTINCT (title) AS course_title
+FROM course
+WHERE course_id NOT IN (
+  SELECT course_id
+  FROM takes
+  WHERE ID IN (
+    SELECT ID
+    FROM student
+    WHERE dept_name = 'Elec. Eng.'
+  )
+)
+ORDER BY course_title;
+
+
+--2
+SELECT s.name AS student_name
+FROM student s
+WHERE s.ID = ANY (
+  SELECT a.s_ID
+  FROM advisor a
+  WHERE a.i_ID IN (
+    SELECT t.ID
+    FROM teaches t
+    WHERE t.course_id = ANY (
+      SELECT t2.course_id
+      FROM takes t2
+      WHERE t2.ID = s.ID
+    )
+  )
+)
+ORDER BY s.NAME;
+
+--3
+SELECT s.name AS student_name, s.DEPT_NAME, s.TOT_CRED TOTAL_CREDIT  
+FROM student s
+WHERE NOT EXISTS (
+  SELECT p.prereq_id
+  FROM prereq p JOIN COURSE c ON (p.COURSE_ID=c.COURSE_ID)
+  WHERE c.TITLE like 'Image Processing' AND c.DEPT_NAME = 'Finance'
+    AND p.prereq_id NOT IN (
+      SELECT t.course_id
+      FROM takes t
+      WHERE t.ID = s.ID
+    )
+)
+ORDER BY s.NAME;
+
+--4
+SELECT ID, name INSTRUCTOR_NAME
+FROM instructor
+WHERE ID IN (
+  SELECT ID
+  FROM teaches
+  GROUP BY ID
+  HAVING COUNT(DISTINCT semester || year) >= 5
+)
+ORDER BY NAME;
+
+--5
+SELECT i.name AS instructor_name, (SELECT TITLE FROM COURSE c WHERE c.COURSE_ID=t.COURSE_ID) course_title, t.YEAR
+FROM instructor i
+JOIN teaches t ON i.ID = t.ID
+WHERE EXISTS (
+  SELECT *
+  FROM teaches t2
+  WHERE t2.ID = i.ID AND t2.course_id = t.course_id AND t2.year = t.year + 1
+)
+ORDER BY t.YEAR;

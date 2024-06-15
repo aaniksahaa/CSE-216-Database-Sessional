@@ -1,0 +1,107 @@
+-- 1. For each instructor, print their ID, name, department name, and the number of other instructors who have at least one building in common where they teach, along with the number of such building(s). You cannot use JOIN or GROUP_BY.
+
+SELECT i1.ID, i1.name, i1.dept_name,
+  (SELECT COUNT(DISTINCT i2.ID)
+   FROM instructor i2, teaches t2, section s2
+   WHERE i2.ID <> i1.ID
+     AND i2.ID = t2.ID AND t2.course_id = s2.course_id AND t2.sec_id = s2.sec_id
+     AND EXISTS (
+       SELECT 1
+       FROM teaches t1, section s1
+       WHERE i1.ID = t1.ID AND t1.course_id = s1.course_id AND t1.sec_id = s1.sec_id
+         AND s1.building = s2.building
+     )
+  ) AS num_instructors,
+  (SELECT COUNT(DISTINCT s2.building)
+   FROM instructor i2, teaches t2, section s2
+   WHERE i2.ID <> i1.ID
+     AND i2.ID = t2.ID AND t2.course_id = s2.course_id AND t2.sec_id = s2.sec_id
+     AND EXISTS (
+       SELECT 1
+       FROM teaches t1, section s1
+       WHERE i1.ID = t1.ID AND t1.course_id = s1.course_id AND t1.sec_id = s1.sec_id
+         AND s1.building = s2.building
+     )
+  ) AS num_building
+FROM instructor i1
+ORDER BY num_instructors DESC;
+
+-- 2. Find the advisors who advise the highest number of students along with the total credits they offer. You must write at least one subquery in the SELECT clause to do this.
+
+SELECT i.dept_name, i.name AS instructor_name, COUNT(a.s_id) AS num_students , 
+          (select sum(c.credits) from teaches t, course c 
+          where t.id = i.id and c.course_id = t.course_id) as tot_cred
+
+FROM instructor i
+JOIN advisor a ON i.ID = a.i_id
+GROUP BY i.dept_name, i.name, i.id
+having COUNT(a.s_id) = (
+  select max(cnt)
+  from (select count(*) as cnt
+  from advisor a1
+  group by a1.i_id)
+  
+)
+
+-- 3. Retrieve the students who have taken more departmental courses than non-departmental ones.  You cannot use JOIN or GROUP_BY in the main query.
+
+
+SELECT s.ID, s.name, s.dept_name
+FROM student s
+WHERE (
+SELECT COUNT(*)
+FROM takes t, course c
+WHERE t.ID = s.ID
+AND t.course_id = c.course_id
+AND c.dept_name = s.dept_name
+) < (
+SELECT COUNT(*)
+FROM takes t, course c
+WHERE t.ID = s.ID
+AND t.course_id = c.course_id
+AND c.dept_name <> s.dept_name
+);
+
+
+-- 4. For each department, find out the average number of credit hours spent by its students for its departmental courses. The average should be calculated by dividing the total number of credits (departmental courses only) taken by the students of that department divided by the number of students who have taken departmental courses. You cannot use JOIN in the main query.
+
+SELECT d.dept_name,
+  Round((SELECT SUM(c.credits)
+   FROM Course c, Takes t, student s
+   WHERE s.dept_name = d.dept_name
+   and s.id = t.id
+     AND t.course_id = c.course_id
+     AND c.dept_name = d.dept_name) / (SELECT Count(t.ID)
+   FROM Course c, Takes t, student s
+   WHERE s.dept_name = d.dept_name
+   and s.id = t.id
+     AND t.course_id = c.course_id
+     AND c.dept_name = d.dept_name), 2) AS total_credit_hours
+FROM Department d;
+
+
+-- 5.  Retrieve the students who have taken at least two courses where one is offered by their advisors and another is offered by some other teacher of their own department.  You cannot use JOIN or GROUP_BY in the main query.
+
+
+
+SELECT s.ID, s.name, s.dept_name
+FROM student s, advisor a
+WHERE EXISTS (
+SELECT 1
+FROM  takes t
+WHERE a.s_id = s.ID
+AND a.s_id = t.ID
+AND t.course_id IN (
+SELECT t2.course_id
+FROM teaches t2
+WHERE t2.ID = a.i_id
+))
+AND EXISTS (
+    SELECT 1
+    FROM takes t, course c, teaches tc
+    WHERE t.ID = s.ID
+      AND t.course_id = c.course_id
+      AND c.dept_name = s.dept_name
+  and tc.ID <> a.i_ID and tc.course_id = c.course_id
+);
+
